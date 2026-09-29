@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Budget Planner</title>
+  <style>
+    body {
+      max-width: 480px;
+      margin: 3rem auto;
+      padding: 0 1rem;
+      font: 16px/1.5 system-ui, sans-serif;
+      color: #222;
+    }
+
+    label {
+      display: block;
+      margin: 1rem 0 0.25rem;
+      font-weight: 600;
+    }
+
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 0.65rem;
+      font: inherit;
+    }
+
+    .position-row {
+      margin: 1.25rem 0;
+      padding: 0 1rem 1rem;
+      border: 1px solid #bbb;
+    }
+
+    .position-row legend {
+      padding: 0 0.35rem;
+      font-weight: 700;
+    }
+
+    .position-row label {
+      margin-top: 0.75rem;
+    }
+
+    button {
+      padding: 0.6rem 0.8rem;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .remove-position {
+      margin-top: 0.75rem;
+    }
+
+    #total {
+      min-height: 1.5em;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    #salarySummary {
+      min-width: 620px;
+    }
+
+    #projectPlan {
+      min-width: 700px;
+    }
+
+    th,
+    td {
+      padding: 0.55rem;
+      border-bottom: 1px solid #bbb;
+      vertical-align: top;
+    }
+
+    thead th,
+    tfoot th,
+    tfoot td {
+      background: #f2f2f2;
+    }
+
+    td input {
+      min-width: 5rem;
+    }
+
+    .remove-phase {
+      white-space: nowrap;
+    }
+
+    .timeline-scroll {
+      overflow-x: auto;
+      margin: 1rem 0;
+      border: 1px solid #bbb;
+    }
+
+    #timelineChart {
+      min-width: max-content;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 190px max-content;
+    }
+
+    .timeline-row + .timeline-row {
+      border-top: 1px solid #ddd;
+    }
+
+    .timeline-label {
+      box-sizing: border-box;
+      width: 190px;
+      padding: 0.55rem;
+      border-right: 1px solid #bbb;
+    }
+
+    .timeline-label strong,
+    .timeline-label span {
+      display: block;
+    }
+
+    .timeline-label span {
+      color: #555;
+      font-size: 0.875rem;
+    }
+
+    .timeline-axis,
+    .timeline-track {
+      display: grid;
+      grid-template-columns: repeat(var(--month-count), minmax(64px, 1fr));
+    }
+
+    .timeline-month {
+      box-sizing: border-box;
+      min-height: 2.5rem;
+      padding: 0.5rem 0.35rem;
+      border-right: 1px solid #ddd;
+      text-align: center;
+    }
+
+    .timeline-header {
+      background: #f2f2f2;
+      font-weight: 700;
+    }
+
+    .timeline-track {
+      grid-template-rows: minmax(2.75rem, auto);
+      align-items: stretch;
+      background: #fff;
+    }
+
+    .timeline-track .timeline-month,
+    .timeline-bar,
+    .timeline-unscheduled {
+      grid-row: 1;
+    }
+
+    .timeline-bar {
+      z-index: 1;
+      align-self: center;
+      overflow: hidden;
+      padding: 0.45rem 0.6rem;
+      border-radius: 3px;
+      color: #fff;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .timeline-unscheduled {
+      z-index: 1;
+      align-self: center;
+      padding: 0.35rem;
+      color: #555;
+      font-size: 0.875rem;
+    }
+
+    .timeline-message {
+      margin: 0;
+      padding: 0.75rem;
+      color: #555;
+    }
+
+    output {
+      display: block;
+      margin-top: 1.5rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Project Budget Planner</h1>
+
+    <h2>Job positions</h2>
+    <div id="positions">
+      <fieldset class="position-row">
+        <legend>Position 1</legend>
+
+        <label>
+          Job title
+          <input type="text" name="jobTitle" placeholder="e.g. Designer">
+        </label>
+
+        <label>
+          Number of people
+          <input type="number" name="people" min="1" step="1" placeholder="e.g. 2">
+        </label>
+
+        <label>
+          Monthly salary per person (€)
+          <input type="number" name="monthlySalary" min="0" step="0.01" placeholder="e.g. 2500">
+        </label>
+
+        <button class="remove-position" type="button" data-remove-position>Remove position</button>
+      </fieldset>
+    </div>
+
+    <button id="addPosition" type="button">Add position</button>
+
+    <label for="duration">Project duration (months)</label>
+    <input id="duration" type="number" min="1" step="1" placeholder="e.g. 6">
+
+    <output id="total" aria-live="polite">Estimated total: —</output>
+
+    <section aria-labelledby="salarySummaryHeading">
+      <h2 id="salarySummaryHeading">Salary summary</h2>
+      <div class="table-wrap">
+        <table id="salarySummary">
+          <thead>
+            <tr>
+              <th scope="col">Job position</th>
+              <th scope="col">People</th>
+              <th scope="col">Monthly salary per person</th>
+              <th scope="col">Monthly total</th>
+              <th scope="col">Project total</th>
+            </tr>
+          </thead>
+          <tbody id="salarySummaryRows"></tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colspan="3">Total</th>
+              <td id="monthlyGrandTotal">—</td>
+              <td id="projectGrandTotal">—</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="projectPlanHeading">
+      <h2 id="projectPlanHeading">Project plan</h2>
+      <div class="table-wrap">
+        <table id="projectPlan">
+          <thead>
+            <tr>
+              <th scope="col">Phase or task</th>
+              <th scope="col">Start month</th>
+              <th scope="col">End month</th>
+              <th scope="col">Resources used</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="projectPlanRows">
+            <tr class="plan-row">
+              <th scope="row"><input type="text" data-plan-phase></th>
+              <td><input type="number" data-plan-start min="1" step="1"></td>
+              <td><input type="number" data-plan-end min="1" step="1"></td>
+              <td><input type="text" data-plan-resources></td>
+              <td><button class="remove-phase" type="button" data-remove-phase>Remove</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button id="addPhase" type="button">Add phase</button>
+
+      <h3>Timeline and resources</h3>
+      <div class="timeline-scroll">
+        <div id="timelineChart" role="table" aria-label="Project timeline showing phases and resources over time"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const positions = document.getElementById("positions");
+    const addPositionButton = document.getElementById("addPosition");
+    const durationInput = document.getElementById("duration");
+    const totalOutput = document.getElementById("total");
+    const salarySummaryRows = document.getElementById("salarySummaryRows");
+    const monthlyGrandTotal = document.getElementById("monthlyGrandTotal");
+    const projectGrandTotal = document.getElementById("projectGrandTotal");
+    const projectPlanRows = document.getElementById("projectPlanRows");
+    const addPhaseButton = document.getElementById("addPhase");
+    const timelineChart = document.getElementById("timelineChart");
+
+    const euroFormatter = new Intl.NumberFormat("en-IE", {
+      style: "currency",
+      currency: "EUR"
+    });
+
+    function updatePositionLabels() {
+      const rows = positions.querySelectorAll(".position-row");
+
+      rows.forEach((row, index) => {
+        row.querySelector("legend").textContent = `Position ${index + 1}`;
+        row.querySelector("[data-remove-position]").disabled = rows.length === 1;
+      });
+    }
+
+    function addPosition() {
+      const position = positions.querySelector(".position-row").cloneNode(true);
+      position.querySelectorAll("input").forEach((input) => {
+        input.value = "";
+      });
+      positions.append(position);
+      updatePositionLabels();
+      updateTotal();
+    }
+
+    function getPositionSummary() {
+      const rows = [...positions.querySelectorAll(".position-row")];
+      const items = rows.map((row, index) => {
+        const title = row.querySelector('[name="jobTitle"]').value.trim();
+        const peopleInput = row.querySelector('[name="people"]');
+        const salaryInput = row.querySelector('[name="monthlySalary"]');
+        const people = Number(peopleInput.value);
+        const salary = Number(salaryInput.value);
+        const valid =
+          peopleInput.value !== "" &&
+          salaryInput.value !== "" &&
+          Number.isInteger(people) &&
+          people >= 1 &&
+          Number.isFinite(salary) &&
+          salary >= 0;
+
+        return {
+          title: title || `Position ${index + 1}`,
+          people,
+          salary,
+          valid
+        };
+      });
+
+      return {
+        items,
+        valid: items.every((item) => item.valid),
+        monthlyTotal: items.reduce(
+          (total, item) => total + (item.valid ? item.people * item.salary : 0),
+          0
+        )
+      };
+    }
+
+    function updateSalarySummary(summary, durationIsValid, duration) {
+      salarySummaryRows.replaceChildren();
+
+      summary.items.forEach((item) => {
+        const row = document.createElement("tr");
+        const values = [
+          item.title,
+          item.valid ? String(item.people) : "—",
+          item.valid ? euroFormatter.format(item.salary) : "—",
+          item.valid ? euroFormatter.format(item.people * item.salary) : "—",
+          item.valid && durationIsValid
+            ? euroFormatter.format(item.people * item.salary * duration)
+            : "—"
+        ];
+
+        values.forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        });
+
+        salarySummaryRows.append(row);
+      });
+
+      monthlyGrandTotal.textContent = summary.valid
+        ? euroFormatter.format(summary.monthlyTotal)
+        : "—";
+      projectGrandTotal.textContent = summary.valid && durationIsValid
+        ? euroFormatter.format(summary.monthlyTotal * duration)
+        : "—";
+    }
+
+    function updateTotal() {
+      const duration = Number(durationInput.value);
+      const durationIsValid =
+        durationInput.value !== "" &&
+        Number.isInteger(duration) &&
+        duration >= 1;
+      const summary = getPositionSummary();
+
+      updateSalarySummary(summary, durationIsValid, duration);
+
+      if (!durationIsValid || !summary.valid) {
+        totalOutput.textContent = "Estimated total: —";
+        return;
+      }
+
+      totalOutput.textContent =
+        `Estimated total: ${euroFormatter.format(summary.monthlyTotal * duration)}`;
+    }
+
+    function updatePlanLabels() {
+      const rows = projectPlanRows.querySelectorAll(".plan-row");
+
+      rows.forEach((row, index) => {
+        const number = index + 1;
+        row.querySelector("[data-plan-phase]").setAttribute("aria-label", `Phase or task ${number}`);
+        row.querySelector("[data-plan-start]").setAttribute("aria-label", `Start month for phase ${number}`);
+        row.querySelector("[data-plan-end]").setAttribute("aria-label", `End month for phase ${number}`);
+        row.querySelector("[data-plan-resources]").setAttribute("aria-label", `Resources used for phase ${number}`);
+        row.querySelector("[data-remove-phase]").setAttribute("aria-label", `Remove phase ${number}`);
+        row.querySelector("[data-remove-phase]").disabled = rows.length === 1;
+      });
+    }
+
+    function addPhase() {
+      const row = document.createElement("tr");
+      row.className = "plan-row";
+      row.innerHTML = `
+        <th scope="row"><input type="text" data-plan-phase></th>
+        <td><input type="number" data-plan-start min="1" step="1"></td>
+        <td><input type="number" data-plan-end min="1" step="1"></td>
+        <td><input type="text" data-plan-resources></td>
+        <td><button class="remove-phase" type="button" data-remove-phase>Remove</button></td>
+      `;
+      projectPlanRows.append(row);
+      updatePlanLabels();
+      updateTimeline();
+    }
+
+    function updateTimeline() {
+      timelineChart.replaceChildren();
+
+      const duration = Number(durationInput.value);
+      if (durationInput.value === "" || !Number.isInteger(duration) || duration < 1) {
+        const message = document.createElement("p");
+        message.className = "timeline-message";
+        message.textContent = "Enter the project duration to display the timeline.";
+        timelineChart.append(message);
+        return;
+      }
+
+      if (duration > 120) {
+        const message = document.createElement("p");
+        message.className = "timeline-message";
+        message.textContent = "The timeline graphic supports projects up to 120 months.";
+        timelineChart.append(message);
+        return;
+      }
+
+      const monthCount = duration;
+      const header = document.createElement("div");
+      header.className = "timeline-row timeline-header";
+      header.setAttribute("role", "row");
+
+      const labelHeader = document.createElement("div");
+      labelHeader.className = "timeline-label";
+      labelHeader.setAttribute("role", "columnheader");
+      labelHeader.textContent = "Phase and resources";
+      header.append(labelHeader);
+
+      const axis = document.createElement("div");
+      axis.className = "timeline-axis";
+      axis.style.setProperty("--month-count", monthCount);
+      axis.setAttribute("role", "presentation");
+
+      for (let month = 1; month <= monthCount; month += 1) {
+        const cell = document.createElement("div");
+        cell.className = "timeline-month";
+        cell.setAttribute("role", "columnheader");
+        cell.textContent = `Month ${month}`;
+        axis.append(cell);
+      }
+
+      header.append(axis);
+      timelineChart.append(header);
+
+      const rows = [...projectPlanRows.querySelectorAll(".plan-row")];
+      const colors = ["#176b5b", "#315f9b", "#9b4b32", "#72558f", "#9a6b12"];
+
+      rows.forEach((row, index) => {
+        const phase = row.querySelector("[data-plan-phase]").value.trim() || `Phase ${index + 1}`;
+        const resources = row.querySelector("[data-plan-resources]").value.trim() || "Resources not specified";
+        const startValue = row.querySelector("[data-plan-start]").value;
+        const endValue = row.querySelector("[data-plan-end]").value;
+        const start = Number(startValue);
+        const end = Number(endValue);
+        const scheduled =
+          startValue !== "" &&
+          endValue !== "" &&
+          Number.isInteger(start) &&
+          Number.isInteger(end) &&
+          start >= 1 &&
+          end >= start &&
+          end <= monthCount;
+
+        const timelineRow = document.createElement("div");
+        timelineRow.className = "timeline-row";
+        timelineRow.setAttribute("role", "row");
+
+        const label = document.createElement("div");
+        label.className = "timeline-label";
+        label.setAttribute("role", "rowheader");
+        const phaseName = document.createElement("strong");
+        phaseName.textContent = phase;
+        const resourceName = document.createElement("span");
+        resourceName.textContent = resources;
+        label.append(phaseName, resourceName);
+        timelineRow.append(label);
+
+        const track = document.createElement("div");
+        track.className = "timeline-track";
+        track.style.setProperty("--month-count", monthCount);
+        track.setAttribute("role", "presentation");
+
+        for (let month = 1; month <= monthCount; month += 1) {
+          const cell = document.createElement("div");
+          cell.className = "timeline-month";
+          cell.setAttribute("aria-hidden", "true");
+          track.append(cell);
+        }
+
+        if (scheduled) {
+          const bar = document.createElement("div");
+          bar.className = "timeline-bar";
+          bar.style.gridColumn = `${start} / ${end + 1}`;
+          bar.style.backgroundColor = colors[index % colors.length];
+          bar.textContent = resources;
+          bar.title = `${phase}: months ${start}-${end}; resources: ${resources}`;
+          bar.setAttribute("role", "cell");
+          track.append(bar);
+        } else {
+          const notice = document.createElement("div");
+          notice.className = "timeline-unscheduled";
+          notice.textContent = "Enter valid start and end months";
+          notice.style.gridColumn = `1 / ${monthCount + 1}`;
+          notice.setAttribute("role", "cell");
+          track.append(notice);
+        }
+
+        timelineRow.append(track);
+        timelineChart.append(timelineRow);
+      });
+    }
+
+    positions.addEventListener("input", updateTotal);
+    durationInput.addEventListener("input", () => {
+      updateTotal();
+      updateTimeline();
+    });
+    addPositionButton.addEventListener("click", addPosition);
+    projectPlanRows.addEventListener("input", updateTimeline);
+
+    positions.addEventListener("click", (event) => {
+      if (event.target.closest("[data-remove-position]")) {
+        event.target.closest(".position-row").remove();
+        updatePositionLabels();
+        updateTotal();
+      }
+    });
+
+    projectPlanRows.addEventListener("click", (event) => {
+      if (event.target.closest("[data-remove-phase]")) {
+        event.target.closest(".plan-row").remove();
+        updatePlanLabels();
+        updateTimeline();
+      }
+    });
+
+    addPhaseButton.addEventListener("click", addPhase);
+
+    updatePositionLabels();
+    updatePlanLabels();
+    updateTotal();
+    updateTimeline();
+  </script>
+</body>
+</html>
